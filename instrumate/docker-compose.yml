@@ -24,31 +24,6 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
 
-  cache:
-    image: redis:7.4-alpine
-    container_name: instrumate_redis_cache
-    restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-
-    # networks:
-    #   - instrumate_network
-    volumes:
-    - redis_data:/data
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-
-
   backend:
     build: .
     env_file:
@@ -58,8 +33,6 @@ services:
     # networks:
     #   - instrumate_network
     depends_on:
-      cache:
-        condition: service_started
       pgdb:
         condition: service_healthy
 

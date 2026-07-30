@@ -1,13 +1,16 @@
 from . import serializers
+from django.conf import settings
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from instrumate.settings import DEBUG
 
 
 class RegistrationView(APIView):
+    authentication_classes = []
 
     def post(self, request):
         serializer = serializers.RegistrationSerializer(data=request.data)
@@ -22,6 +25,7 @@ class RegistrationView(APIView):
 
 
 class LoginView(APIView):
+    authentication_classes = []
 
     def gen_tokens(self, user):
         jwt_tokens = RefreshToken.for_user(user)
@@ -39,17 +43,27 @@ class LoginView(APIView):
 
         if user is not None:
             tokens = self.gen_tokens(user)
-            response = Response({"message": "login successful",
-                                 "access_token": tokens.get('access_token')},
+            response = Response({"message": "login successful",},
                                 status=status.HTTP_200_OK)
-
+# set httponly and secure to not debug
             response.set_cookie(
                 key='refresh_token',
                 value=str(tokens.get('refresh_token')),
-                httponly=True,
-                secure=True,
+                httponly= not DEBUG,
+                secure=not DEBUG,
                 samesite='Lax',
+                path='/auth/refresh/'
             )
+
+            response.set_cookie(
+                key='access_token',
+                value=str(tokens.get('access_token')),
+                httponly=not DEBUG,
+                secure=not DEBUG,
+                samesite='Lax',
+                path='/'
+            )
+
             return response
 
         return Response({"error": "invalid login"},
@@ -57,9 +71,10 @@ class LoginView(APIView):
 
 
 class RefreshTokenView(APIView):
+    authentication_classes = []
+
     def post(self, request):
         refresh_token = request.COOKIES.get('refresh_token')
-
         try:
             refresh_token = RefreshToken(refresh_token)
             response = Response({"message": "successful refresh",
@@ -67,11 +82,21 @@ class RefreshTokenView(APIView):
                                 status=status.HTTP_200_OK)
 
             response.set_cookie(
+                key='access_token',
+                value=str(refresh_token.access_token),
+                httponly=not DEBUG,
+                secure=not DEBUG,
+                samesite='Lax',
+                path='/'
+            )
+
+            response.set_cookie(
                 key='refresh_token',
                 value=str(refresh_token),
-                httponly=True,
-                secure=True,
+                httponly=not DEBUG,
+                secure=not DEBUG,
                 samesite='Lax',
+                path='/auth/refresh/'
             )
             return response
 
@@ -81,19 +106,14 @@ class RefreshTokenView(APIView):
 
 
 class LogoutView(APIView):
+    authentication_classes = []
 
     def post(self, request):
         response = Response({"message": "user logged out"},
                             status=status.HTTP_200_OK)
 
-        response.set_cookie(
-            key='refresh_token',
-            value='',
-            httponly=True,
-            secure=True,
-            samesite='Lax',
-            max_age=0
-        )
+        response.delete_cookie('refresh_token', path='/auth/refresh/')
+        response.delete_cookie('access_token', path='/')
         return response
 
 

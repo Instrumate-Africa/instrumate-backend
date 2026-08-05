@@ -172,7 +172,11 @@ class AuthTests(APITestCase):
             response.data["message"],
             "successful refresh"
         )
+<<<<<<< HEAD
         self.assertIn("access_token", response.cookies)
+=======
+        self.assertIn("access_token", response.data)
+>>>>>>> f32d381 (Implement API tests for auth and LMS modules)
         self.assertIn("refresh_token", response.cookies)
 
     def test_refresh_without_token(self):

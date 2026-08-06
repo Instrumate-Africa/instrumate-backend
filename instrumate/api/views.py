@@ -1,11 +1,9 @@
 import os
-import uuid
 import re
 import json
 import sqlite3
 import requests
 import tempfile
-import redis
 import pymupdf
 from django.conf import settings
 from rest_framework import status
@@ -112,24 +110,15 @@ class HandleUpload(APIView):
                 for chunk in uploaded_file.chunks():
                     destination.write(chunk)
 
-            redis_client = redis.Redis(
-                host=os.getenv('REDIS_HOST', 'localhost'),
-                port=int(os.getenv('REDIS_PORT', 6379)),
-                decode_responses=True,
-                )
-
             # store chunks in redis
             self.file_chunker()
             sentences: list[str] = []
             for i in range(0, len(self.chunks),1):
                 sentences += split_sentences(self.chunks[i]["text"])
-            task_id = str(uuid.uuid4())
-            redis_client.setex(task_id, 300, json.dumps(sentences))  # Store for 5 minutes(300s)
-            # Store context for the response
             context = {
-                "task_id": task_id,
                 "file_name": self.file_path,
-                "chunks": self.chunks,
+                # "chunks": self.chunks,
+                "sentences": sentences
             }
 
             return Response(context, status=status.HTTP_200_OK)
@@ -139,74 +128,31 @@ class HandleUpload(APIView):
 
 class Eng_To_KSL(APIView):
     def post(self, request):
-
-        try:
-            redis_client = redis.Redis(
-                host=os.getenv('REDIS_HOST', 'localhost'),
-                port=int(os.getenv('REDIS_PORT', 6379)),
-                decode_responses=True,
-            )
-        except Exception as e:
-            return Response({"error": f"Redis connection failed: {str(e)}"}, 
-                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-        task_id = request.data.get("task_id")
         text = request.data.get("text", "")
-        print(text)
-
-         # If frontend didn't pass a task_id, generate one and cache the input text
-        if not task_id:
-            task_id = str(uuid.uuid4())
-            try:
-                sentences = split_sentences(text)
-                redis_client.setex(task_id, 300, json.dumps(sentences))
-            except Exception as e:
-                return Response({"error": f"Failed to process or cache text: {str(e)}"}, 
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # load cached sentences from Redis
-        cached_sentences = redis_client.get(task_id)
+        sentences = split_sentences(text)
         translation: str = ""
-        if not cached_sentences:
-            return Response(
-                    {"error": "No cached data found for the provided task_id"},
-                    status=status.HTTP_404_NOT_FOUND
-                    )
-        # Step 2: Parse the cached sentences into json
-        dict_cached_sentences = json.loads(str(cached_sentences))
-        # Step 3: Translate each sentence
         translated_sentences: list[str] = []
 
-        # Translation path
         TRANSLATION_SERVICE_URL = f"{MODEL_URL}/translate/english-to-ksl"
 
-        for sentence in dict_cached_sentences:
-            sentence_key = f"{task_id}:{sentence}"
-            cached_translation = redis_client.get(sentence_key)
+        for sentence in sentences:
+            try:
+                response = requests.post(
+                    TRANSLATION_SERVICE_URL,
+                    json={"text": sentence},
+                    timeout=10
+                )
 
-            if not cached_translation:
-                try:
-                    response = requests.post(
-                        TRANSLATION_SERVICE_URL,
-                        json={"text": sentence},
-                        timeout=10 # Inference can take a few seconds
-                    )
-
-                    if response.status_code == 200:
-                        # Extract from {"translation": "..."} based on your FastAPI return
-                        translation = response.json().get("translation")
-                        redis_client.set(sentence_key, translation, ex=300)
-                    else:
-                        translation = "[Translation Error]"
-                except requests.exceptions.RequestException as e:
-                    return Response({"error": f"Translation service unreachable: {str(e)}"}, 
-                                    status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            else:
-                translation = cached_translation
+                if response.status_code == 200:
+                    translation = response.json().get("translation")
+                else:
+                    translation = "[Translation Error]"
+            except requests.exceptions.RequestException as e:
+                return Response({"error": f"Translation service unreachable: {str(e)}"}, 
+                                status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
             translated_sentences.append(translation)
 
-        # Step 4: Reconstruct (Rest of your logic remains exactly the same)
         full_translation = reconstruct_sentences(translated_sentences)
         translated_sentences = split_sentences(full_translation)
 
@@ -214,13 +160,9 @@ class Eng_To_KSL(APIView):
         for sentence in translated_sentences:
             words.extend(split_words(sentence))
 
-        full_translation_key = f"{task_id}:full_translation"
-        redis_client.setex(full_translation_key, 300, json.dumps(words))
-
         return Response({
-            "task_id": full_translation_key,
+            "original_sentences": sentences,
             "translated_sentences": translated_sentences,
-            "original_sentences": dict_cached_sentences,
             "words": words
         }, status=status.HTTP_200_OK)
 
@@ -233,7 +175,7 @@ class KSL_To_Eng(APIView):
             response = requests.post(
                 TRANSLATION_SERVICE_URL,
                 json={"text": text},
-                timeout=10 # Inference can take a few seconds
+                timeout=10
             )
 
             if response.status_code == 200:

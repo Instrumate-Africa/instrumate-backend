@@ -24,6 +24,8 @@ To set up and build the project locally, follow these steps:
    - **Locally**
     ```bash
     $ python manage.py runserver
+    # or
+    $ gunicorn instrumate.asgi:application -k uvicorn_worker.UvicornWorker
     ```
 
    - **Using Docker**

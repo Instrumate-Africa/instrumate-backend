@@ -8,9 +8,12 @@ django-stubs==6.0.6
 django-stubs-ext==6.0.6
 djangorestframework==3.16.0
 djangorestframework_simplejwt==5.5.0
+gunicorn==26.0.0
+h11==0.16.0
 idna==3.18
 joblib==1.5.3
 nltk==3.9.4
+packaging==26.2
 psycopg2-binary==2.9.12
 PyJWT==2.9.0
 PyMuPDF==1.27.2.3
@@ -23,3 +26,5 @@ tqdm==4.68.3
 types-PyYAML==6.0.12.20260518
 typing_extensions==4.15.0
 urllib3==2.7.0
+uvicorn==0.51.0
+uvicorn-worker==0.4.0

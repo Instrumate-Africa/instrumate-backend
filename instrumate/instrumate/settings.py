@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'nltk',
 ]
 
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -39,9 +40,13 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+CORS_ALLOW_CREDENTIALS = True
+
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ]
+
 
 ROOT_URLCONF = 'instrumate.urls'
 
@@ -49,7 +54,7 @@ AUTH_USER_MODEL = 'auth_.CustomUser'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'auth_.authentication.CookieJWTAuthentication',
     ),
 }
 
@@ -80,7 +85,7 @@ DATABASES = {
         'NAME': os.getenv('PSQL_DB_NAME'),
         'USER': os.getenv('PSQL_DB_USER'),
         'PASSWORD': os.getenv('PSQL_DB_PASSWORD'),
-        'HOST': os.getenv('PSQL_DB_HOST', os.getenv('DOCKER_DB_SERVICE_NAME','localhost')),
+        'HOST': os.getenv('PSQL_DB_HOST', os.getenv('DOCKER_DB_SERVICE_NAME', 'localhost')),
         'PORT': os.getenv('PSQL_DB_PORT', 5432)
     },
     'movement_files': {

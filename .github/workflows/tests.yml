@@ -26,5 +26,5 @@ jobs:
 
       - name: Run tests
         env:
-          SECRET_KEY = ci-test-secret
+          SECRET_KEY=ci-test-secret
         run: python manage.py test

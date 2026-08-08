@@ -74,11 +74,14 @@ class RefreshTokenView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        refresh_token = request.COOKIES.get('refresh_token')
+        refresh_token = request.COOKIES.get('refresh_token', None)
+        if refresh_token is None:
+            return Response({"error": "No refresh token provided."},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
         try:
             refresh_token = RefreshToken(refresh_token)
-            response = Response({"message": "successful refresh",
-                                 "access_token": str(refresh_token.access_token)},
+            response = Response({"message": "successful refresh"},
                                 status=status.HTTP_200_OK)
 
             response.set_cookie(

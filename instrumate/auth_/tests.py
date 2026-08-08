@@ -112,7 +112,7 @@ class AuthTests(APITestCase):
             response.data["message"],
             "login successful"
         )
-        self.assertIn("access_token", response.data)
+        self.assertIn("access_token", response.cookies)
         self.assertIn("refresh_token", response.cookies)
 
     def test_login_wrong_password(self):
@@ -172,7 +172,7 @@ class AuthTests(APITestCase):
             response.data["message"],
             "successful refresh"
         )
-        self.assertIn("access_token", response.data)
+        self.assertIn("access_token", response.cookies)
         self.assertIn("refresh_token", response.cookies)
 
     def test_refresh_without_token(self):

@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = os.getenv('SECRET_KEY')
-DEBUG = os.getenv('DEBUG')
+DEBUG = os.getenv('DEBUG', True)
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
@@ -82,7 +82,7 @@ DATABASE_ROUTERS = ['routers.MovementRouter']
 if 'test' in sys.argv:
     default_db = {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'memory'
+        'NAME': ':memory:'
     }
 else:
     default_db = {

@@ -80,27 +80,30 @@ WSGI_APPLICATION = 'instrumate.wsgi.application'
 DATABASE_ROUTERS = ['routers.MovementRouter']
 
 if 'test' in sys.argv:
-    default_db = {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': ':memory:'
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+            'TEST': {
+                'NAME': ':memory:'
+            }
+        },
     }
 else:
-    default_db = {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('PSQL_DB_NAME'),
-        'USER': os.getenv('PSQL_DB_USER'),
-        'PASSWORD': os.getenv('PSQL_DB_PASSWORD'),
-        'HOST': os.getenv('PSQL_DB_HOST', os.getenv('DOCKER_DB_SERVICE_NAME', 'localhost')),
-        'PORT': os.getenv('PSQL_DB_PORT', 5432)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('PSQL_DB_NAME'),
+            'USER': os.getenv('PSQL_DB_USER'),
+            'PASSWORD': os.getenv('PSQL_DB_PASSWORD'),
+            'HOST': os.getenv('PSQL_DB_HOST', os.getenv('DOCKER_DB_SERVICE_NAME', 'localhost')),
+            'PORT': os.getenv('PSQL_DB_PORT', 5432)
+        },
+        'movement_files': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.getenv('SQLITE_DB_NAME'),
+        }
     }
-
-DATABASES = {
-    'default': default_db,
-    'movement_files': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.getenv('SQLITE_DB_NAME'),
-    }
-}
 
 AUTH_PASSWORD_VALIDATORS = [
     {

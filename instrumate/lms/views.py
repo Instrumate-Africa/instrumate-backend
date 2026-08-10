@@ -1,13 +1,19 @@
+from typing import cast
 import os
 import csv
+import tempfile
 from django.conf import settings
+import numpy as np
 from rest_framework import status
+import sqlite3
+
+from . import pipeline
 from . import models, serializers
 from rest_framework import viewsets
 from django.http import JsonResponse
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-
+from rest_framework.decorators import api_view
 
 class CourseViewSet (viewsets.ModelViewSet):
     queryset = models.Course.objects.all()
@@ -186,3 +192,55 @@ class CompletedCourseViewSet (viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+def get_ref_frames_from_db () -> np.ndarray:
+    return np.array([])
+
+@api_view(["POST"])
+def get_feedback (request):
+    word = request.data.get('word', None)
+    if word is None:
+        return Response({"error": "No word to evaluate!"}, status=status.HTTP_400_BAD_REQUEST)
+
+    uploaded_video = request.FILES.get("user_sign_video")
+    if not uploaded_video:
+        return Response({"error": "No uploaded video file detected!"}, status=status.HTTP_400_BAD_REQUEST)
+
+    file_name = uploaded_video.name
+    tmp_dir  = tempfile.gettempdir()
+    file_dir = os.path.join(tmp_dir, "upload_dir/videos")
+    if not os.path.exists(file_dir):
+        os.makedirs(file_dir)
+    file_path = os.path.join(file_dir, file_name)
+
+    try:
+        with open(file_path, "wb+") as destination:
+            for chunk in uploaded_video.chunks():
+                destination.write(chunk)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    u_coords: np.ndarray = cast(
+            np.ndarray,
+            pipeline.extract.extract_sign_poses(file_path, True)
+        )
+    r_coords: np.ndarray = get_ref_frames_from_db()
+
+    # output -> [0:[hip_centers], 1:[shoulder_widths], 2:[frames]]
+    u_output = pipeline.normalize.np_normalize(u_coords)
+    r_output = pipeline.normalize.np_normalize(r_coords)
+    normalized_u_coords: np.ndarray = u_output[2]
+    normalized_r_coords: np.ndarray = r_output[2]
+
+    path = pipeline.dynamic_time_warp.np_dynamic_time_warp(normalized_u_coords, normalized_r_coords)
+    elbow_feedback  = pipeline.diffing.eval_elbow_pos (normalized_u_coords, normalized_r_coords, path)
+    wrist_feedback  = pipeline.diffing.eval_wrist_pos (normalized_u_coords, normalized_r_coords, path)
+    finger_feedback = pipeline.diffing.eval_finger_pos(normalized_u_coords, normalized_r_coords, path)
+
+    total_feedback = {
+            "elbow":   elbow_feedback,
+            "wrist":   wrist_feedback,
+            "fingers": finger_feedback
+        }
+
+    return Response (total_feedback, status=status.HTTP_200_OK)

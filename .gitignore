@@ -1,6 +1,6 @@
 .venv
 .direnv
-instrumate/content
+# instrumate/content
 instrumate/pg_data
 instrumate/.env
 instrumate/**/migrations

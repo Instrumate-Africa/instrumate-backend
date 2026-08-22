@@ -61,5 +61,5 @@ jobs:
           context: ./instrumate
           push: true
           tags: |
-            ghcr.io/$NAMESPACE/$IMAGE_NAME:$VERSION
-            ghcr.io/$NAMESPACE/$IMAGE_NAME:${{ github.sha }}
+            ghcr.io/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+            ghcr.io/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ github.sha }}

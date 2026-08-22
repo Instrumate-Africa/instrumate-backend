@@ -53,7 +53,7 @@ jobs:
 
       - name: Build and Push Image
         env:
-          NAMESPACE: Instrumate-Africa
+          NAMESPACE: instrumate-africa
           IMAGE_NAME: ia-backend
           VERSION: latest
         uses: docker/build-push-action@v6

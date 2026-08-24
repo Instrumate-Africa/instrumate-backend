@@ -25,7 +25,6 @@ INSTALLED_APPS = [
     'auth_',
     'api',
     'lms',
-    'redis',
     'nltk',
 ]
 

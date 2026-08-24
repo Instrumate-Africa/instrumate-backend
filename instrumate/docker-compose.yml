@@ -15,32 +15,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-    # networks:
-    #   - instrumate_network
-
     ports:
       - "${PSQL_DB_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
 
   backend:
-    build: .
+    image: ghcr.io/instrumate-africa/ia-backend:latest
     env_file:
       - .env
     ports:
       - "${BACKEND_PORT:-8000}:8000"
-    # networks:
-    #   - instrumate_network
     depends_on:
       pgdb:
         condition: service_healthy
 
-# networks:
-#   instrumate_network:
-#     external: true
-#     name: instrumate_shared_network
-#
 volumes:
   pg_data:
-  redis_data:

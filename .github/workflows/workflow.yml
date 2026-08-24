@@ -3,7 +3,8 @@ name: Test and Build API Image
 on:
   pull_request:
     types: [opened, synchronized, reopened]
-
+    branches:
+      - master
   push:
     branches:
       - master
@@ -38,7 +39,7 @@ jobs:
 
   build-docker:
     needs: tests
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo

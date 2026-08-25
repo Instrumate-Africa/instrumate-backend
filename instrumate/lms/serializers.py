@@ -24,8 +24,14 @@ class CourseProgressionSerializer (serializers.ModelSerializer):
     class Meta:
         model = models.CourseProgression
         fields = '__all__'
-        read_only_fields = ['last_entry']
-        depth = 1
+        read_only_fields = ['user', 'last_entry']
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep['course'] = CourseSerializer(instance.course).data
+        rep['current_module'] = ModuleSerializer(instance.current_module).data
+        rep['current_chapter'] = ChapterSerializer(instance.current_chapter).data
+        return rep
 
 class CompletedSignableSerializer (serializers.ModelSerializer):
     class Meta:
@@ -34,9 +40,12 @@ class CompletedSignableSerializer (serializers.ModelSerializer):
         read_only_fields = ['completed_at']
 
 class CompletedCourseSerializer (serializers.ModelSerializer):
-    course = CourseSerializer()
-
     class Meta:
         model = models.CompletedCourse
         fields = '__all__'
-        read_only_fields = ['completed_at']
+        read_only_fields = ['user', 'completed_at']
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep['course'] = CourseSerializer(instance.course).data
+        return rep

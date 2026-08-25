@@ -11,6 +11,7 @@ from . import pipeline
 from . import models, serializers
 from rest_framework import viewsets
 from django.http import JsonResponse
+from django.db.models import QuerySet
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view
@@ -39,29 +40,29 @@ class ModuleViewSet (viewsets.ModelViewSet):
         course_progress = models.CourseProgression.objects.filter(user=request.user).first()
         if course_progress is None:
             for module in serializer.data:
-                module['completed'] = "false"
+                module['status'] = "incomplete"
             return Response (serializer.data, status=status.HTTP_200_OK)
 
-        current_module = self.get_queryset().filter(pk=course_progress.current_module).first()
+        current_module = self.get_queryset().filter(pk=course_progress.current_module.id).first()
         assert(current_module is not None)
         for module in serializer.data:
             if module.get('sort_index') < current_module.sort_index:
-                module['completed'] = "false"
+                module['status'] = "complete"
             elif module.get('sort_index') == current_module.sort_index:
-                module['completed'] = "pending"
+                module['status'] = "pending"
             else:
-                module['completed'] = "true"
+                module['status'] = "incomplete"
 
         return Response (serializer.data)
 
     def retrieve (self, request, pk):
         module: models.Module = self.get_object()
         course_progress = models.CourseProgression.objects.filter(user=request.user).first()
-        if course_progress is None and int(pk) > 1:
+        if course_progress is None and module.sort_index > 1:
             return Response ({"error": "Not allowed to access this module when the previous ones are not done"})
 
         if course_progress is not None:
-            current_module = self.get_queryset().get(pk=course_progress.current_module)
+            current_module = self.get_queryset().get(pk=course_progress.current_module.id)
             if module.sort_index > current_module.sort_index:
                 return Response (
                         {"error":"Not allowed to access this module when the previous ones are not done"}
@@ -88,37 +89,37 @@ class ChapterViewSet (viewsets.ModelViewSet):
         current_progression = models.CourseProgression.objects.filter(user=request.user).first()
         if current_progression is None:
             for chapter in serializer.data:
-                chapter["completed"] = False
+                chapter["status"] = "incomplete"
             return Response (serializer.data)
 
-        current_chapter = chapters.get(id=current_progression.current_chapter)
+        current_chapter = chapters.filter(pk=current_progression.current_chapter.id).first()
         if current_chapter is None:
             for chapter in serializer.data:
-                chapter["completed"] = False
+                chapter["status"] = "incomplete"
             return Response (serializer.data)
 
         for chapter in serializer.data:
-            chapter_index = chapter.get('sort_index')
-            current_index = chapter.get('sort_index')
+            chapter_index = chapter.get('sort_index', 0)
+            current_index = current_chapter.sort_index
             if chapter_index < current_index:
-                chapter["completed"] = "true"
+                chapter["status"] = "complete"
             elif chapter_index == current_index:
-                chapter["completed"] = "pending"
+                chapter["status"] = "pending"
             else:
-                chapter["completed"] = "false"
+                chapter["status"] = "incomplete"
 
         return Response (serializer.data)
 
     def retrieve (self, request, pk):
         chapter = self.get_object()
         course_progress = models.CourseProgression.objects.filter(user=request.user).first()
-        if course_progress is None and int(pk) > 1:
+        if course_progress is None and chapter.sort_index > 1:
             return Response (
                     {"error":"Not allowed to access this chapter when the previous ones are not done"}
                     )
 
         if course_progress is not None:
-            current_chapter = self.get_queryset().get(pk=course_progress.current_chapter)
+            current_chapter = self.get_queryset().get(pk=course_progress.current_chapter.id)
             if chapter.sort_index > current_chapter.sort_index:
                 return Response (
                         {"error":"Not allowed to access this chapter when the previous ones are not done"}
@@ -143,7 +144,7 @@ class CompletedSignableViewSet (viewsets.ModelViewSet):
         if not chapter.is_signable:
             return Response ({"error":"Chapter is not of signable type! Malformed request!"})
 
-        completed_signables_for_chapter = self.get_queryset().filter(chapter=chapter_id)
+        completed_signables_for_chapter = self.get_queryset().filter(user=request.user, chapter=chapter_id)
         completed_words: list[str] = [signable.word for signable in completed_signables_for_chapter]
         chapter_content_filepath = os.path.join(settings.BASE_DIR, "content", chapter.content_filepath)
 
@@ -156,7 +157,7 @@ class CompletedSignableViewSet (viewsets.ModelViewSet):
                         {
                             "english"   : row[0],
                             "swahili"   : row[1],
-                            "completed" : True if row[0] in completed_words else False
+                            "status"    : "complete" if row[0] in completed_words else "incomplete"
                         }
                     )
 
@@ -167,10 +168,16 @@ class CompletedSignableViewSet (viewsets.ModelViewSet):
         return JsonResponse(response_json, status=status.HTTP_200_OK)
 
 class CourseProgressionViewSet (viewsets.ModelViewSet):
-
     queryset = models.CourseProgression.objects.all()
     serializer_class = serializers.CourseProgressionSerializer
     permission_classes = [IsAuthenticated,]
+
+    def get_queryset(self): # type: ignore[override]
+        return models.CourseProgression.objects.select_related(
+                'course',
+                'current_module',
+                'current_chapter'
+                ).filter(user=self.request.user)
 
     def create (self, request):
         instance = self.get_queryset().filter(user=request.user).first()
@@ -190,8 +197,19 @@ class CompletedCourseViewSet (viewsets.ModelViewSet):
     serializer_class = serializers.CompletedCourseSerializer
     permission_classes = [IsAuthenticated,]
 
+    def get_queryset(self): # type: ignore[override]
+        return models.CompletedCourse.objects.select_related(
+                'course',
+                ).filter(user=self.request.user)
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def list (self, request):
+        completed_courses = self.get_queryset().filter(user=request.user)
+        serializer = self.get_serializer(completed_courses, many=True)
+        return Response(serializer.data, 200)
+
 
 def get_ref_frames_from_db () -> np.ndarray:
     return np.array([])

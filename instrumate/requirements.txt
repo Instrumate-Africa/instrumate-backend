@@ -21,6 +21,7 @@ idna==3.18
 installer==1.0.1
 joblib==1.5.3
 kiwisolver==1.5.0
+ksl-pipeline @ git+https://github.com/Instrumate-Africa/KSL-pipeline.git@26c1f0568a1c8bf81617ec94baf3c1c704a64314
 matplotlib==3.10.9
 mediapipe==0.10.33
 nab-index==0.0.13

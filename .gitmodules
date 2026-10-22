@@ -1,0 +1,12 @@
+[submodule "instrumate/lms/ksl-pipeline"]
+	path = instrumate/lms/ksl-pipeline
+	url = git@gh-work:Instrumate-Africa/KSL-pipeline.git
+[submodule "instrumate/lms/ksl_pipeline"]
+	path = instrumate/lms/ksl_pipeline
+	url = git@gh-work:Instrumate-Africa/KSL-pipeline.git
+[submodule "instrumate/instrumate/ksl_pipeline"]
+	path = instrumate/instrumate/ksl_pipeline
+	url = git@gh-work:Instrumate-Africa/KSL-pipeline.git
+[submodule "instrumate/ksl_pipeline"]
+	path = instrumate/ksl_pipeline
+	url = git@gh-work:Instrumate-Africa/KSL-pipeline.git

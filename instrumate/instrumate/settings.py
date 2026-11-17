@@ -42,11 +42,9 @@ MIDDLEWARE = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
-
 
 ROOT_URLCONF = 'instrumate.urls'
 
@@ -57,7 +55,6 @@ REST_FRAMEWORK = {
         'auth_.authentication.CookieJWTAuthentication',
     ),
 }
-
 
 TEMPLATES = [
     {
@@ -103,6 +100,8 @@ else:
             'NAME': os.getenv('SQLITE_DB_NAME'),
         }
     }
+
+DATASET_DBNAME = os.getenv('KSL_DATASET_DB_NAME', 'dataset-v02.sqlite3.db')
 
 AUTH_PASSWORD_VALIDATORS = [
     {

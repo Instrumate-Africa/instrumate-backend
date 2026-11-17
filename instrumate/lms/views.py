@@ -1,20 +1,20 @@
-from typing import cast
 import os
+import io
 import csv
-import tempfile
-from django.conf import settings
-import numpy as np
-from rest_framework import status
 import sqlite3
+import tempfile
+import numpy as np
+from typing import cast
+from django.conf import settings
 
-from . import pipeline
+from pipeline import extract, normalize, diffing, dynamic_time_warp
 from . import models, serializers
-from rest_framework import viewsets
 from django.http import JsonResponse
-from django.db.models import QuerySet
+from rest_framework import status
+from rest_framework import viewsets
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view
+from rest_framework.permissions import IsAuthenticated
 
 class CourseViewSet (viewsets.ModelViewSet):
     queryset = models.Course.objects.all()
@@ -208,11 +208,22 @@ class CompletedCourseViewSet (viewsets.ModelViewSet):
     def list (self, request):
         completed_courses = self.get_queryset().filter(user=request.user)
         serializer = self.get_serializer(completed_courses, many=True)
-        return Response(serializer.data, 200)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-def get_ref_frames_from_db () -> np.ndarray:
-    return np.array([])
+def get_ref_frames_from_db (word: str) -> np.ndarray:
+    cxn = sqlite3.connect(settings.DATASET_DBNAME)
+    cur = cxn.cursor()
+    cur.execute("select frames from records where word = ?", word)
+    row = cur.fetchone()
+    r_frames = np.array([])
+    if row:
+        blob = row[0]
+        with io.BytesIO(blob) as bio:
+            r_frames = np.load(bio)
+    cxn.close()
+    return r_frames
+
 
 @api_view(["POST"])
 def get_feedback (request):
@@ -220,8 +231,8 @@ def get_feedback (request):
     if word is None:
         return Response({"error": "No word to evaluate!"}, status=status.HTTP_400_BAD_REQUEST)
 
-    uploaded_video = request.FILES.get("user_sign_video")
-    if not uploaded_video:
+    uploaded_video = request.FILES.get("user_sign_video", None)
+    if uploaded_video is None:
         return Response({"error": "No uploaded video file detected!"}, status=status.HTTP_400_BAD_REQUEST)
 
     file_name = uploaded_video.name
@@ -238,22 +249,26 @@ def get_feedback (request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    opts = extract.setup_models(model_dir=os.path.join(settings.BASE_DIR, "assets/models"))
     u_coords: np.ndarray = cast(
             np.ndarray,
-            pipeline.extract.extract_sign_poses(file_path, True)
+            extract.extract_sign_poses(file_path, opts=opts, output_as_ndarray=True)
         )
-    r_coords: np.ndarray = get_ref_frames_from_db()
 
     # output -> [0:[hip_centers], 1:[shoulder_widths], 2:[frames]]
-    u_output = pipeline.normalize.np_normalize(u_coords)
-    r_output = pipeline.normalize.np_normalize(r_coords)
+    u_output = normalize.np_normalize(u_coords)
     normalized_u_coords: np.ndarray = u_output[2]
-    normalized_r_coords: np.ndarray = r_output[2]
+    normalized_r_coords: np.ndarray = get_ref_frames_from_db(word=word)
+    if len(normalized_r_coords) == 0:
+        return Response(
+                {"message": "word not found in reference database."},
+                status=status.HTTP_404_NOT_FOUND
+                )
 
-    path = pipeline.dynamic_time_warp.np_dynamic_time_warp(normalized_u_coords, normalized_r_coords)
-    elbow_feedback  = pipeline.diffing.eval_elbow_pos (normalized_u_coords, normalized_r_coords, path)
-    wrist_feedback  = pipeline.diffing.eval_wrist_pos (normalized_u_coords, normalized_r_coords, path)
-    finger_feedback = pipeline.diffing.eval_finger_pos(normalized_u_coords, normalized_r_coords, path)
+    path = dynamic_time_warp.np_dynamic_time_warp(normalized_u_coords, normalized_r_coords)
+    elbow_feedback  = diffing.eval_elbow_pos (normalized_u_coords, normalized_r_coords, path)
+    wrist_feedback  = diffing.eval_wrist_pos (normalized_u_coords, normalized_r_coords, path)
+    finger_feedback = diffing.eval_finger_pos(normalized_u_coords, normalized_r_coords, path)
 
     total_feedback = {
             "elbow":   elbow_feedback,
